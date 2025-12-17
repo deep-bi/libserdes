@@ -53,9 +53,10 @@ typedef enum {
  * Configuration object
  */
 struct serdes_conf_s {
-        url_list_t  schema_registry_urls;      /* CSV list of schema
-                                                * registry URLs. */
-        int         debug;                     /* Debugging 1=enabled */
+        url_list_t    schema_registry_urls;      /* CSV list of schema
+                                                  * registry URLs. */
+        client_cert_t client_cert;               /* Client and CA certificates */
+        int           debug;                     /* Debugging 1=enabled */
 
 
         serdes_framing_t   serializer_framing;   /* Serializer framing */

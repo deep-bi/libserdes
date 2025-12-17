@@ -78,6 +78,17 @@ serdes_err_t serdes_conf_set (serdes_conf_t *sconf,
                               char *errstr, int errstr_size);
 
 
+/**
+ * Set the client certificate and CA paths
+ */
+SERDES_EXPORT
+serdes_err_t serdes_conf_set_client_cert (serdes_conf_t *sconf,
+                                          const char *ca_location,
+                                          const char *certificate_location,
+                                          const char *key_location,
+                                          const char *key_password,
+                                          char *errstr, int errstr_size);
+
 
 /**
  * Set optional schema loader.

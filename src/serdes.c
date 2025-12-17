@@ -41,6 +41,8 @@ const char *serdes_err2str (serdes_err_t err) {
                 return "Serializer failed";
         case SERDES_ERR_BUFFER_SIZE:
                 return "Inadequate buffer size";
+        case SERDES_ERR_NULL_PARAM:
+                return "NULL parameter where not allowed";
         default:
                 return "(unknown error)";
         }
@@ -49,6 +51,7 @@ const char *serdes_err2str (serdes_err_t err) {
 
 static void serdes_conf_destroy0 (serdes_conf_t *sconf) {
         url_list_clear(&sconf->schema_registry_urls);
+        client_cert_clear(&sconf->client_cert);
 }
 
 void serdes_conf_destroy (serdes_conf_t *sconf) {
@@ -66,6 +69,10 @@ static void serdes_conf_copy0 (serdes_conf_t *dst, const serdes_conf_t *src) {
         if (src->schema_registry_urls.str)
                 url_list_parse(&dst->schema_registry_urls,
                                src->schema_registry_urls.str);
+        serdes_conf_set_client_cert(dst, src->client_cert.ca_location,
+                                    src->client_cert.certificate_location,
+                                    src->client_cert.key_location,
+                                    src->client_cert.key_password, NULL, 0);
         dst->serializer_framing   = src->serializer_framing;
         dst->deserializer_framing = src->deserializer_framing;
         dst->debug   = src->debug;
@@ -130,6 +137,34 @@ serdes_err_t serdes_conf_set (serdes_conf_t *sconf,
                          "Unknown configuration property %s", name);
                 return SERDES_ERR_CONF_UNKNOWN;
         }
+
+        return SERDES_ERR_OK;
+}
+
+
+serdes_err_t serdes_conf_set_client_cert (serdes_conf_t *sconf,
+                                          const char *ca_location,
+                                          const char *certificate_location,
+                                          const char *key_location,
+                                          const char *key_password,
+                                          char *errstr, int errstr_size) {
+        if (!sconf)
+        {
+                snprintf(errstr, errstr_size,
+                         "serdes_conf_set_client_cert: sconf is NULL");
+                return SERDES_ERR_NULL_PARAM;
+        }
+
+        client_cert_clear(&sconf->client_cert);
+
+        sconf->client_cert.ca_location =
+                ca_location ? strdup(ca_location) : NULL;
+        sconf->client_cert.certificate_location =
+                certificate_location ? strdup(certificate_location) : NULL;
+        sconf->client_cert.key_location =
+                key_location ? strdup(key_location) : NULL;
+        sconf->client_cert.key_password =
+                key_password ? strdup(key_password) : NULL;
 
         return SERDES_ERR_OK;
 }
