@@ -38,6 +38,17 @@ typedef struct url_list_s {
 
 
 /**
+ * An object containing paths to client and CA certificates
+ */
+typedef struct client_cert_s {
+        char *ca_location;
+        char *certificate_location;
+        char *key_location;
+        char *key_password;
+} client_cert_t;
+
+
+/**
  * Parse a comma-separated list of URLs and store them in the provided 'ul'.
  * Returns the number of parsed URLs.
  */
@@ -48,6 +59,12 @@ int url_list_parse (url_list_t *ul, const char *urls);
  * Free resources associated with an URL list.
  */
 void url_list_clear (url_list_t *ul);
+
+
+/**
+ * Free resources associated with a client cert obj.
+ */
+void client_cert_clear (client_cert_t *cc);
 
 
 /**
@@ -101,14 +118,15 @@ void rest_response_destroy (rest_response_t *rr);
  *
  * This is a blocking call.
  */
-rest_response_t *rest_get (url_list_t *ul, const char *url_path_fmt, ...);
+rest_response_t *rest_get (url_list_t *ul, client_cert_t *cc,
+                           const char *url_path_fmt, ...);
 
 
 /* REST PUT request.
  *
  * Same semantics as `rest_get()` but POSTs `payload` of `size` bytes.
  */
-rest_response_t *rest_post (url_list_t *ul,
+rest_response_t *rest_post (url_list_t *ul, client_cert_t *cc,
                             const void *payload, int size,
                             const char *url_path_fmt, ...);
 
