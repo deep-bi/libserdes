@@ -8,6 +8,9 @@ VERSION?=	SNAPSHOT
 # Jenkins CI integration
 BUILD_NUMBER ?= 1
 
+# Flag to enable building tests (default: disabled)
+ENABLE_TESTS ?= 0
+
 .PHONY:
 
 all: mklove-check libs check
@@ -17,7 +20,10 @@ include mklove/Makefile.base
 LIBSUBDIRS_$(ENABLE_AVRO_CPP) += src-cpp
 LIBSUBDIRS=	src $(LIBSUBDIRS_y)
 
-
+# Add tests directory if ENABLE_TESTS is set
+ifneq ($(ENABLE_TESTS),1)
+LIBSUBDIRS += tests
+endif
 
 libs:
 	@(for d in $(LIBSUBDIRS); do $(MAKE) -C $$d || exit $?; done)
