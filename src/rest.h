@@ -38,7 +38,7 @@ typedef struct url_list_s {
 
 
 /**
- * An object containing paths to client and CA certificates
+ * An object containing paths related to the client certificate
  */
 typedef struct client_cert_s {
         char *ca_location;
@@ -46,6 +46,15 @@ typedef struct client_cert_s {
         char *key_location;
         char *key_password;
 } client_cert_t;
+
+
+/**
+ * TLS configuration
+ */
+typedef struct tls_config_s {
+        client_cert_t client_cert;
+        int tls_min_version;
+} tls_config_t;
 
 
 /**
@@ -118,7 +127,8 @@ void rest_response_destroy (rest_response_t *rr);
  *
  * This is a blocking call.
  */
-rest_response_t *rest_get (url_list_t *ul, client_cert_t *cc,
+rest_response_t *rest_get (url_list_t *ul,
+                           const tls_config_t *tls_conf,
                            const char *url_path_fmt, ...);
 
 
@@ -126,7 +136,8 @@ rest_response_t *rest_get (url_list_t *ul, client_cert_t *cc,
  *
  * Same semantics as `rest_get()` but POSTs `payload` of `size` bytes.
  */
-rest_response_t *rest_post (url_list_t *ul, client_cert_t *cc,
+rest_response_t *rest_post (url_list_t *ul,
+                            const tls_config_t *tls_conf,
                             const void *payload, int size,
                             const char *url_path_fmt, ...);
 

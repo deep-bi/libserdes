@@ -367,9 +367,11 @@ static CURLcode rest_req_curl (CURL *curl, rest_response_t *rr) {
  *
  * Returns a response handle which needs to be checked for error.
  */
-static rest_response_t *rest_req (url_list_t *ul, client_cert_t *cc,
-                                  rest_cmd_t cmd, const void *payload,
-                                  int size, const char *url_path_fmt, va_list ap) {
+static rest_response_t *rest_req (url_list_t *ul,
+                                  const tls_config_t *tls_conf,
+                                  rest_cmd_t cmd,
+                                  const void *payload, int size,
+                                  const char *url_path_fmt, va_list ap) {
 
         CURL *curl;
         CURLcode ccode;
@@ -436,10 +438,11 @@ static rest_response_t *rest_req (url_list_t *ul, client_cert_t *cc,
                 break;
         }
 
-        do_curl_setopt(curl, CURLOPT_CAINFO, cc->ca_location);
-        do_curl_setopt(curl, CURLOPT_SSLCERT, cc->certificate_location);
-        do_curl_setopt(curl, CURLOPT_SSLKEY, cc->key_location);
-        do_curl_setopt(curl, CURLOPT_KEYPASSWD, cc->key_password);
+        do_curl_setopt(curl, CURLOPT_CAINFO, tls_conf->client_cert.ca_location);
+        do_curl_setopt(curl, CURLOPT_SSLCERT, tls_conf->client_cert.certificate_location);
+        do_curl_setopt(curl, CURLOPT_SSLKEY, tls_conf->client_cert.key_location);
+        do_curl_setopt(curl, CURLOPT_KEYPASSWD, tls_conf->client_cert.key_password);
+        do_curl_setopt(curl, CURLOPT_SSLVERSION, tls_conf->tls_min_version);
 
         /* Try each URL in the URL list until one works. */
         ccode = CURLE_URL_MALFORMAT;
@@ -475,27 +478,29 @@ static rest_response_t *rest_req (url_list_t *ul, client_cert_t *cc,
 
 
 
-rest_response_t *rest_get (url_list_t *ul, client_cert_t *cc,
+rest_response_t *rest_get (url_list_t *ul,
+                           const tls_config_t *tls_conf,
                            const char *url_path_fmt, ...) {
         rest_response_t *rr;
         va_list ap;
 
         va_start(ap, url_path_fmt);
-        rr = rest_req(ul, cc, REST_GET, NULL, 0, url_path_fmt, ap);
+        rr = rest_req(ul, tls_conf, REST_GET, NULL, 0, url_path_fmt, ap);
         va_end(ap);
 
         return rr;
 }
 
 
-rest_response_t *rest_post (url_list_t *ul, client_cert_t *cc,
+rest_response_t *rest_post (url_list_t *ul,
+                            const tls_config_t *tls_conf,
                             const void *payload, int size,
                             const char *url_path_fmt, ...) {
         rest_response_t *rr;
         va_list ap;
 
         va_start(ap, url_path_fmt);
-        rr = rest_req(ul, cc, REST_POST, payload, size, url_path_fmt, ap);
+        rr = rest_req(ul, tls_conf, REST_POST, payload, size, url_path_fmt, ap);
         va_end(ap);
 
         return rr;

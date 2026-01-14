@@ -17,6 +17,7 @@
 #include "serdes_int.h"
 
 #include <stdarg.h>
+#include <curl/curl.h>
 
 const char *serdes_err2str (serdes_err_t err) {
         switch (err)
@@ -51,7 +52,7 @@ const char *serdes_err2str (serdes_err_t err) {
 
 static void serdes_conf_destroy0 (serdes_conf_t *sconf) {
         url_list_clear(&sconf->schema_registry_urls);
-        client_cert_clear(&sconf->client_cert);
+        client_cert_clear(&sconf->tls_conf.client_cert);
 }
 
 void serdes_conf_destroy (serdes_conf_t *sconf) {
@@ -69,10 +70,10 @@ static void serdes_conf_copy0 (serdes_conf_t *dst, const serdes_conf_t *src) {
         if (src->schema_registry_urls.str)
                 url_list_parse(&dst->schema_registry_urls,
                                src->schema_registry_urls.str);
-        serdes_conf_set_client_cert(dst, src->client_cert.ca_location,
-                                    src->client_cert.certificate_location,
-                                    src->client_cert.key_location,
-                                    src->client_cert.key_password, NULL, 0);
+        serdes_conf_set_client_cert(dst, src->tls_conf.client_cert.ca_location,
+                                    src->tls_conf.client_cert.certificate_location,
+                                    src->tls_conf.client_cert.key_location,
+                                    src->tls_conf.client_cert.key_password, NULL, 0);
         dst->serializer_framing   = src->serializer_framing;
         dst->deserializer_framing = src->deserializer_framing;
         dst->debug   = src->debug;
@@ -121,6 +122,34 @@ serdes_err_t serdes_conf_set (serdes_conf_t *sconf,
                 else
                         sconf->deserializer_framing = framing;
 
+        } else if (!strcmp(name, "schema.registry.ssl.tls.min.version")) {
+                if (!strcmp(val, "1.0")) {
+                        sconf->tls_conf.tls_min_version = CURL_SSLVERSION_TLSv1_0;
+                } else if (!strcmp(val, "1.1")) {
+                        sconf->tls_conf.tls_min_version = CURL_SSLVERSION_TLSv1_1;
+                } else if (!strcmp(val, "1.2")) {
+                        sconf->tls_conf.tls_min_version = CURL_SSLVERSION_TLSv1_2;
+                } else if (!strcmp(val, "1.3")) {
+#ifdef CURL_SSLVERSION_TLSv1_3
+                        sconf->tls_conf.tls_min_version = CURL_SSLVERSION_TLSv1_3;
+#else
+                        snprintf(errstr, errstr_size,
+                                 "TLS 1.3 not supported by this version of libcurl");
+                        return SERDES_ERR_CONF_INVALID;
+#endif
+                } else {
+                        snprintf(errstr, errstr_size,
+                                 "Invalid value for %s, allowed values: "
+                                 "1.0, 1.1, 1.2%s", name,
+#ifdef CURL_SSLVERSION_TLSv1_3
+                                 ", 1.3"
+#else
+                                 ""
+#endif
+                                 );
+                        return SERDES_ERR_CONF_INVALID;
+                }
+
         } else if (!strcmp(name, "debug")) {
                 if (!strcmp(val, "all"))
                         sconf->debug = 1;
@@ -148,22 +177,21 @@ serdes_err_t serdes_conf_set_client_cert (serdes_conf_t *sconf,
                                           const char *key_location,
                                           const char *key_password,
                                           char *errstr, int errstr_size) {
-        if (!sconf)
-        {
+        if (!sconf) {
                 snprintf(errstr, errstr_size,
                          "serdes_conf_set_client_cert: sconf is NULL");
                 return SERDES_ERR_NULL_PARAM;
         }
 
-        client_cert_clear(&sconf->client_cert);
+        client_cert_clear(&sconf->tls_conf.client_cert);
 
-        sconf->client_cert.ca_location =
+        sconf->tls_conf.client_cert.ca_location =
                 ca_location ? strdup(ca_location) : NULL;
-        sconf->client_cert.certificate_location =
+        sconf->tls_conf.client_cert.certificate_location =
                 certificate_location ? strdup(certificate_location) : NULL;
-        sconf->client_cert.key_location =
+        sconf->tls_conf.client_cert.key_location =
                 key_location ? strdup(key_location) : NULL;
-        sconf->client_cert.key_password =
+        sconf->tls_conf.client_cert.key_password =
                 key_password ? strdup(key_password) : NULL;
 
         return SERDES_ERR_OK;

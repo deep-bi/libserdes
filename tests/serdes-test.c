@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <curl/curl.h>
 #include "test-macros.h"
 #include "serdes_int.h"
 
@@ -34,10 +35,10 @@ static void unittest_setting_client_cert (void)
 
     assert(err_buf[0] == '\0');
     assert(err == SERDES_ERR_OK);
-    assert(!strcmp(sconf->client_cert.ca_location, "ca_location"));
-    assert(!strcmp(sconf->client_cert.certificate_location, "certificate_location"));
-    assert(!strcmp(sconf->client_cert.key_location, "key_location"));
-    assert(sconf->client_cert.key_password == NULL);
+    assert(!strcmp(sconf->tls_conf.client_cert.ca_location, "ca_location"));
+    assert(!strcmp(sconf->tls_conf.client_cert.certificate_location, "certificate_location"));
+    assert(!strcmp(sconf->tls_conf.client_cert.key_location, "key_location"));
+    assert(sconf->tls_conf.client_cert.key_password == NULL);
 
     serdes_conf_destroy(sconf);
 }
@@ -70,25 +71,29 @@ static void unittest_setting_client_certificate_twice (void)
     memset(err_buf, 0, sizeof(err_buf));
     const char* dummy_string = "dummy_string";
 
-    serdes_conf_set_client_cert(sconf,
-                                dummy_string,
-                                dummy_string,
-                                dummy_string,
-                                dummy_string,
-                                err_buf, sizeof(err_buf));
-
-    serdes_conf_set_client_cert(sconf,
-                          "ca_location",
-                          "certificate_location",
-                          "key_location",
-                          "key_password",
-                          err_buf, sizeof(err_buf));
+    serdes_err_t err = serdes_conf_set_client_cert(sconf,
+                                                   dummy_string,
+                                                   dummy_string,
+                                                   dummy_string,
+                                                   dummy_string,
+                                                   err_buf, sizeof(err_buf));
 
     assert(err_buf[0] == '\0');
-    assert(!strcmp(sconf->client_cert.ca_location, "ca_location"));
-    assert(!strcmp(sconf->client_cert.certificate_location, "certificate_location"));
-    assert(!strcmp(sconf->client_cert.key_location, "key_location"));
-    assert(!strcmp(sconf->client_cert.key_password, "key_password"));
+    assert(err == SERDES_ERR_OK);
+
+    err = serdes_conf_set_client_cert(sconf,
+                                      "ca_location",
+                                      "certificate_location",
+                                      "key_location",
+                                      "key_password",
+                                      err_buf, sizeof(err_buf));
+
+    assert(err_buf[0] == '\0');
+    assert(err == SERDES_ERR_OK);
+    assert(!strcmp(sconf->tls_conf.client_cert.ca_location, "ca_location"));
+    assert(!strcmp(sconf->tls_conf.client_cert.certificate_location, "certificate_location"));
+    assert(!strcmp(sconf->tls_conf.client_cert.key_location, "key_location"));
+    assert(!strcmp(sconf->tls_conf.client_cert.key_password, "key_password"));
 
     serdes_conf_destroy(sconf);
 }
@@ -108,18 +113,58 @@ static void unittest_serdes_conf_deep_copy (void) {
                           err_buf, sizeof(err_buf));
 
     serdes_conf_t *sconf_copy = serdes_conf_copy(sconf);
-    assert(!strcmp(sconf_copy->client_cert.ca_location, "ca_location"));
-    assert(!strcmp(sconf_copy->client_cert.certificate_location, "certificate_location"));
-    assert(!strcmp(sconf_copy->client_cert.key_location, "key_location"));
-    assert(sconf_copy->client_cert.key_password == NULL);
+    assert(!strcmp(sconf_copy->tls_conf.client_cert.ca_location, "ca_location"));
+    assert(!strcmp(sconf_copy->tls_conf.client_cert.certificate_location, "certificate_location"));
+    assert(!strcmp(sconf_copy->tls_conf.client_cert.key_location, "key_location"));
+    assert(sconf_copy->tls_conf.client_cert.key_password == NULL);
 
-    assert(sconf_copy->client_cert.ca_location != sconf->client_cert.ca_location);
-    assert(sconf_copy->client_cert.certificate_location != sconf->client_cert.certificate_location);
-    assert(sconf_copy->client_cert.key_location != sconf->client_cert.key_location);
-    assert(sconf_copy->client_cert.key_password == sconf->client_cert.key_password);
+    assert(sconf_copy->tls_conf.client_cert.ca_location != sconf->tls_conf.client_cert.ca_location);
+    assert(sconf_copy->tls_conf.client_cert.certificate_location != sconf->tls_conf.client_cert.certificate_location);
+    assert(sconf_copy->tls_conf.client_cert.key_location != sconf->tls_conf.client_cert.key_location);
+    assert(sconf_copy->tls_conf.client_cert.key_password == sconf->tls_conf.client_cert.key_password);
 
     serdes_conf_destroy(sconf);
     serdes_conf_destroy(sconf_copy);
+}
+
+static void unittest_setting_min_tls_version (void) {
+    serdes_conf_t *sconf = serdes_conf_new(NULL, 0, NULL);
+
+    char err_buf[512];
+    memset(err_buf, 0, sizeof(err_buf));
+
+    const char* min_tls_version_key = "schema.registry.ssl.tls.min.version";
+    const char* min_tls_version_value = "1.1";
+    const int expected_min_tls_version = CURL_SSLVERSION_TLSv1_1;
+
+    serdes_err_t err = serdes_conf_set(sconf,
+                                       min_tls_version_key,
+                                       min_tls_version_value,
+                                       err_buf, sizeof(err_buf));
+
+    assert(err_buf[0] == '\0');
+    assert(err == SERDES_ERR_OK);
+    assert(sconf->tls_conf.tls_min_version == expected_min_tls_version);
+    serdes_conf_destroy(sconf);
+}
+
+static void unittest_setting_incorrect_min_tls_version (void) {
+    serdes_conf_t *sconf = serdes_conf_new(NULL, 0, NULL);
+
+    char err_buf[512];
+    memset(err_buf, 0, sizeof(err_buf));
+
+    const char* min_tls_version_key = "schema.registry.ssl.tls.min.version";
+    const char* min_tls_version_value = "dummy";
+
+    serdes_err_t err = serdes_conf_set(sconf,
+                                       min_tls_version_key,
+                                       min_tls_version_value,
+                                       err_buf, sizeof(err_buf));
+
+    assert(err_buf[0] != '\0');
+    assert(err == SERDES_ERR_CONF_INVALID);
+    serdes_conf_destroy(sconf);
 }
 
 void register_serdes_test (void)
@@ -128,4 +173,6 @@ void register_serdes_test (void)
     RUN_TEST(unittest_attempt_to_set_client_cert_with_null_conf);
     RUN_TEST(unittest_setting_client_certificate_twice);
     RUN_TEST(unittest_serdes_conf_deep_copy);
+    RUN_TEST(unittest_setting_min_tls_version);
+    RUN_TEST(unittest_setting_incorrect_min_tls_version);
 }
