@@ -21,7 +21,7 @@ LIBSUBDIRS_$(ENABLE_AVRO_CPP) += src-cpp
 LIBSUBDIRS=	src $(LIBSUBDIRS_y)
 
 # Add tests directory if ENABLE_TESTS is set
-ifneq ($(ENABLE_TESTS),1)
+ifeq ($(ENABLE_TESTS),1)
 LIBSUBDIRS += tests
 endif
 

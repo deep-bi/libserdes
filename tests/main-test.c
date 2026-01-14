@@ -24,4 +24,6 @@ int main (void) {
     RUN_SUITE(register_rest_test);
     RUN_SUITE(register_serdes_test);
     printf("[==========] All tests completed\n");
+
+    return 0;
 }
