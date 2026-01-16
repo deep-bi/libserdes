@@ -130,23 +130,12 @@ serdes_err_t serdes_conf_set (serdes_conf_t *sconf,
                 } else if (!strcmp(val, "1.2")) {
                         sconf->tls_conf.tls_min_version = CURL_SSLVERSION_TLSv1_2;
                 } else if (!strcmp(val, "1.3")) {
-#ifdef CURL_SSLVERSION_TLSv1_3
                         sconf->tls_conf.tls_min_version = CURL_SSLVERSION_TLSv1_3;
-#else
-                        snprintf(errstr, errstr_size,
-                                 "TLS 1.3 not supported by this version of libcurl");
-                        return SERDES_ERR_CONF_INVALID;
-#endif
+
                 } else {
                         snprintf(errstr, errstr_size,
                                  "Invalid value for %s, allowed values: "
-                                 "1.0, 1.1, 1.2%s", name,
-#ifdef CURL_SSLVERSION_TLSv1_3
-                                 ", 1.3"
-#else
-                                 ""
-#endif
-                                 );
+                                 "1.0, 1.1, 1.2, 1.3", name);
                         return SERDES_ERR_CONF_INVALID;
                 }
 
