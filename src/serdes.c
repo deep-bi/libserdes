@@ -74,6 +74,7 @@ static void serdes_conf_copy0 (serdes_conf_t *dst, const serdes_conf_t *src) {
                                     src->tls_conf.client_cert.certificate_location,
                                     src->tls_conf.client_cert.key_location,
                                     src->tls_conf.client_cert.key_password, NULL, 0);
+        dst->tls_conf.tls_min_version = src->tls_conf.tls_min_version;
         dst->serializer_framing   = src->serializer_framing;
         dst->deserializer_framing = src->deserializer_framing;
         dst->debug   = src->debug;
