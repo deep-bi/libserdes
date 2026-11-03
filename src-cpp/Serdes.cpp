@@ -77,6 +77,10 @@ static int create_serdes (HandleImpl *hnd, const Conf *conf, std::string &errstr
 
   if (confimpl) {
     sconf = serdes_conf_copy(confimpl->conf_);
+    if (!sconf) {
+      errstr = serdes_err2str(SERDES_ERR_NO_MEMORY);
+      return -1;
+    }
 
     serdes_conf_set_opaque(sconf, (void *)hnd);
 
@@ -93,10 +97,9 @@ static int create_serdes (HandleImpl *hnd, const Conf *conf, std::string &errstr
                                  schema_load_cb_trampoline,
                                  schema_unload_cb_trampoline);
 
+  /* serdes_new() takes ownership of sconf, also when it fails. */
   hnd->sd_ = serdes_new(sconf, c_errstr, sizeof(c_errstr));
   if (!hnd->sd_) {
-    if (sconf)
-      serdes_conf_destroy(sconf);
     errstr = c_errstr;
     return -1;
   }
