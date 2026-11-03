@@ -57,7 +57,7 @@ SERDES_EXPORT
 void serdes_conf_destroy (serdes_conf_t *sconf);
 
 /**
- * Returns a copy of `src`.
+ * Returns a copy of `src`, or NULL if memory allocation failed.
  */
 SERDES_EXPORT
 serdes_conf_t *serdes_conf_copy (const serdes_conf_t *src);
@@ -79,7 +79,21 @@ serdes_err_t serdes_conf_set (serdes_conf_t *sconf,
 
 
 /**
- * Set the client certificate and CA paths
+ * Set the CA certificate path, the client certificate and key paths, and
+ * the client key password used for HTTPS requests to the schema registry.
+ * Replaces all four values; a NULL argument leaves that setting unset, so
+ * cURL uses its default (e.g. the built-in CA bundle when `ca_location`
+ * is NULL). The same settings are available as the
+ * `schema.registry.ssl.*` properties of `serdes_conf_set()`.
+ *
+ * Returns:
+ *  `SERDES_ERR_OK` on success,
+ *  `SERDES_ERR_NULL_PARAM` if `sconf` is NULL,
+ *  `SERDES_ERR_NO_MEMORY` if a value could not be copied, in which case
+ *  the previous settings are kept.
+ *
+ * On error a human readable error description is written to `errstr`,
+ * unless `errstr` is NULL.
  */
 SERDES_EXPORT
 serdes_err_t serdes_conf_set_client_cert (serdes_conf_t *sconf,

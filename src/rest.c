@@ -209,11 +209,25 @@ void url_list_clear (url_list_t *ul) {
 }
 
 
+/**
+ * Overwrite a secret before freeing it, so it does not linger in freed
+ * memory. The volatile access keeps the compiler from dropping the writes.
+ */
+static void free_secret (char *s) {
+        volatile char *p = s;
+
+        if (!s)
+                return;
+        while (*p)
+                *p++ = '\0';
+        free(s);
+}
+
 void client_cert_clear (client_cert_t *cc) {
         free(cc->ca_location);
         free(cc->certificate_location);
         free(cc->key_location);
-        free(cc->key_password);
+        free_secret(cc->key_password);
 
         cc->ca_location = NULL;
         cc->certificate_location = NULL;
@@ -438,11 +452,23 @@ static rest_response_t *rest_req (url_list_t *ul,
                 break;
         }
 
-        do_curl_setopt(curl, CURLOPT_CAINFO, tls_conf->client_cert.ca_location);
-        do_curl_setopt(curl, CURLOPT_SSLCERT, tls_conf->client_cert.certificate_location);
-        do_curl_setopt(curl, CURLOPT_SSLKEY, tls_conf->client_cert.key_location);
-        do_curl_setopt(curl, CURLOPT_KEYPASSWD, tls_conf->client_cert.key_password);
-        do_curl_setopt(curl, CURLOPT_SSLVERSION, tls_conf->tls_min_version);
+        /* Only apply the TLS settings that are configured: setting an option
+         * to NULL resets cURL's default, e.g. clears the built-in CA bundle. */
+        if (tls_conf->client_cert.ca_location)
+                do_curl_setopt(curl, CURLOPT_CAINFO,
+                               tls_conf->client_cert.ca_location);
+        if (tls_conf->client_cert.certificate_location)
+                do_curl_setopt(curl, CURLOPT_SSLCERT,
+                               tls_conf->client_cert.certificate_location);
+        if (tls_conf->client_cert.key_location)
+                do_curl_setopt(curl, CURLOPT_SSLKEY,
+                               tls_conf->client_cert.key_location);
+        if (tls_conf->client_cert.key_password)
+                do_curl_setopt(curl, CURLOPT_KEYPASSWD,
+                               tls_conf->client_cert.key_password);
+        if (tls_conf->tls_min_version)
+                do_curl_setopt(curl, CURLOPT_SSLVERSION,
+                               tls_conf->tls_min_version);
 
         /* Try each URL in the URL list until one works. */
         ccode = CURLE_URL_MALFORMAT;

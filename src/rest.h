@@ -53,7 +53,7 @@ typedef struct client_cert_s {
  */
 typedef struct tls_config_s {
         client_cert_t client_cert;
-        int tls_min_version;
+        long tls_min_version;   /* CURL_SSLVERSION_*, 0 = cURL default */
 } tls_config_t;
 
 

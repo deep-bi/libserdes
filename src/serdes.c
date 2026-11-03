@@ -44,6 +44,8 @@ const char *serdes_err2str (serdes_err_t err) {
                 return "Inadequate buffer size";
         case SERDES_ERR_NULL_PARAM:
                 return "NULL parameter where not allowed";
+        case SERDES_ERR_NO_MEMORY:
+                return "Memory allocation failed";
         default:
                 return "(unknown error)";
         }
@@ -63,17 +65,18 @@ void serdes_conf_destroy (serdes_conf_t *sconf) {
 
 /**
  * Low-level serdes_conf_t copy
+ *
+ * Fails only if the TLS settings cannot be copied, in which case `dst`
+ * must not be used, since it would silently lack them.
  */
-static void serdes_conf_copy0 (serdes_conf_t *dst, const serdes_conf_t *src) {
+static serdes_err_t serdes_conf_copy0 (serdes_conf_t *dst,
+                                       const serdes_conf_t *src,
+                                       char *errstr, int errstr_size) {
 
         url_list_clear(&dst->schema_registry_urls);
         if (src->schema_registry_urls.str)
                 url_list_parse(&dst->schema_registry_urls,
                                src->schema_registry_urls.str);
-        serdes_conf_set_client_cert(dst, src->tls_conf.client_cert.ca_location,
-                                    src->tls_conf.client_cert.certificate_location,
-                                    src->tls_conf.client_cert.key_location,
-                                    src->tls_conf.client_cert.key_password, NULL, 0);
         dst->tls_conf.tls_min_version = src->tls_conf.tls_min_version;
         dst->serializer_framing   = src->serializer_framing;
         dst->deserializer_framing = src->deserializer_framing;
@@ -82,12 +85,21 @@ static void serdes_conf_copy0 (serdes_conf_t *dst, const serdes_conf_t *src) {
         dst->schema_unload_cb = src->schema_unload_cb;
         dst->log_cb  = src->log_cb;
         dst->opaque = src->opaque;
+
+        return serdes_conf_set_client_cert(
+                dst, src->tls_conf.client_cert.ca_location,
+                src->tls_conf.client_cert.certificate_location,
+                src->tls_conf.client_cert.key_location,
+                src->tls_conf.client_cert.key_password, errstr, errstr_size);
 }
 
 serdes_conf_t *serdes_conf_copy (const serdes_conf_t *src) {
         serdes_conf_t *dst;
         dst = serdes_conf_new(NULL, 0, NULL);
-        serdes_conf_copy0(dst, src);
+        if (serdes_conf_copy0(dst, src, NULL, 0) != SERDES_ERR_OK) {
+                serdes_conf_destroy(dst);
+                return NULL;
+        }
         return dst;
 }
 
@@ -140,6 +152,32 @@ serdes_err_t serdes_conf_set (serdes_conf_t *sconf,
                         return SERDES_ERR_CONF_INVALID;
                 }
 
+        } else if (!strcmp(name, "schema.registry.ssl.ca.location") ||
+                   !strcmp(name, "schema.registry.ssl.certificate.location") ||
+                   !strcmp(name, "schema.registry.ssl.key.location") ||
+                   !strcmp(name, "schema.registry.ssl.key.password")) {
+                const client_cert_t *cc = &sconf->tls_conf.client_cert;
+                const char *ca_location = cc->ca_location;
+                const char *certificate_location = cc->certificate_location;
+                const char *key_location = cc->key_location;
+                const char *key_password = cc->key_password;
+                /* An empty value unsets the property */
+                const char *v = *val ? val : NULL;
+
+                if (!strcmp(name, "schema.registry.ssl.ca.location"))
+                        ca_location = v;
+                else if (!strcmp(name, "schema.registry.ssl.certificate.location"))
+                        certificate_location = v;
+                else if (!strcmp(name, "schema.registry.ssl.key.location"))
+                        key_location = v;
+                else
+                        key_password = v;
+
+                return serdes_conf_set_client_cert(sconf, ca_location,
+                                                   certificate_location,
+                                                   key_location, key_password,
+                                                   errstr, errstr_size);
+
         } else if (!strcmp(name, "debug")) {
                 if (!strcmp(val, "all"))
                         sconf->debug = 1;
@@ -167,22 +205,36 @@ serdes_err_t serdes_conf_set_client_cert (serdes_conf_t *sconf,
                                           const char *key_location,
                                           const char *key_password,
                                           char *errstr, int errstr_size) {
+        client_cert_t cc = { NULL, NULL, NULL, NULL };
+
         if (!sconf) {
-                snprintf(errstr, errstr_size,
-                         "serdes_conf_set_client_cert: sconf is NULL");
+                if (errstr && errstr_size > 0)
+                        snprintf(errstr, errstr_size,
+                                 "serdes_conf_set_client_cert: sconf is NULL");
                 return SERDES_ERR_NULL_PARAM;
         }
 
-        client_cert_clear(&sconf->tls_conf.client_cert);
+        /* Copy all values before releasing the current ones: a failed
+         * allocation then leaves the configuration unchanged, and the
+         * arguments may point to the current values (see serdes_conf_set). */
+        if ((ca_location &&
+             !(cc.ca_location = strdup(ca_location))) ||
+            (certificate_location &&
+             !(cc.certificate_location = strdup(certificate_location))) ||
+            (key_location &&
+             !(cc.key_location = strdup(key_location))) ||
+            (key_password &&
+             !(cc.key_password = strdup(key_password)))) {
+                client_cert_clear(&cc);
+                if (errstr && errstr_size > 0)
+                        snprintf(errstr, errstr_size,
+                                 "serdes_conf_set_client_cert: "
+                                 "out of memory");
+                return SERDES_ERR_NO_MEMORY;
+        }
 
-        sconf->tls_conf.client_cert.ca_location =
-                ca_location ? strdup(ca_location) : NULL;
-        sconf->tls_conf.client_cert.certificate_location =
-                certificate_location ? strdup(certificate_location) : NULL;
-        sconf->tls_conf.client_cert.key_location =
-                key_location ? strdup(key_location) : NULL;
-        sconf->tls_conf.client_cert.key_password =
-                key_password ? strdup(key_password) : NULL;
+        client_cert_clear(&sconf->tls_conf.client_cert);
+        sconf->tls_conf.client_cert = cc;
 
         return SERDES_ERR_OK;
 }
@@ -291,8 +343,13 @@ serdes_t *serdes_new (serdes_conf_t *conf, char *errstr, size_t errstr_size) {
         mtx_init(&sd->sd_lock, mtx_plain);
 
         if (conf) {
-                serdes_conf_copy0(&sd->sd_conf, conf);
+                serdes_err_t err = serdes_conf_copy0(&sd->sd_conf, conf,
+                                                     errstr, (int)errstr_size);
                 serdes_conf_destroy(conf);
+                if (err != SERDES_ERR_OK) {
+                        serdes_destroy(sd);
+                        return NULL;
+                }
         } else
                 serdes_conf_init(&sd->sd_conf);
 

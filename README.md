@@ -65,11 +65,15 @@ libserdes typically only needs to be configured with a list of URLs
 to the schema registries, all other configuration is optional.
 
  * `schema.registry.url` - comma separated list of schema registry base URLs (no default)
- * `schema.registry.ssl.ca.location` - path to ca certificate (no default)
- * `schema.registry.ssl.certificate.location` - path to client certificate (no default)
- * `schema.registry.ssl.key.location` - path to the client key (no default)
- * `schema.registry.ssl.key.password` - password for the client's key (no default)
- * `schema.registry.ssl.tls.min.version` - minimum TLS version, e.g. `1.0`, `1.1`, `1.2` or `1.3` (no default)
+ * `schema.registry.ssl.ca.location` - path to the CA certificate used to verify the schema registry (default: cURL's built-in CA bundle)
+ * `schema.registry.ssl.certificate.location` - path to the client certificate, for mutual TLS (no default)
+ * `schema.registry.ssl.key.location` - path to the client key, for mutual TLS (no default)
+ * `schema.registry.ssl.key.password` - password for the client key (no default)
+ * `schema.registry.ssl.tls.min.version` - minimum TLS version: `1.0`, `1.1`, `1.2` or `1.3` (default: cURL's default)
  * `deserializer.framing` - expected framing format when deserializing data: `none` or `cp1` (Confluent Platform framing). (default: `cp1`)
  * `serializer.framing` - framing format inserted when serializing data: `none` or `cp1` (Confluent Platform framing). (default: `cp1`)
  * `debug` - enable/disable debugging with `all` or `none`. (default: `none`)
+
+Setting one of the `schema.registry.ssl.*` location or password properties
+to an empty string unsets it. From C, the four can also be set in one call
+with `serdes_conf_set_client_cert()`.

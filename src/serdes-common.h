@@ -36,7 +36,8 @@ typedef enum {
         SERDES_ERR_SCHEMA_REQUIRED,   /* Schema required to perform operation */
         SERDES_ERR_SERIALIZER,        /* Serializer failed */
         SERDES_ERR_BUFFER_SIZE,       /* Inadequate buffer size */
-        SERDES_ERR_NULL_PARAM         /* NULL parameter where not allowed */
+        SERDES_ERR_NULL_PARAM,        /* NULL parameter where not allowed */
+        SERDES_ERR_NO_MEMORY          /* Memory allocation failed */
 } serdes_err_t;
 
 
